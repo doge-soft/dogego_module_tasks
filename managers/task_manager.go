@@ -1,10 +1,12 @@
 package managers
 
 import (
+	"github.com/doge-soft/dogego_module_mutex"
 	"github.com/doge-soft/dogego_module_tasks/models"
 	"log"
 	"reflect"
 	"runtime"
+	"time"
 )
 
 type TaskManager struct {
@@ -42,18 +44,34 @@ func (manager *TaskManager) RegisterAsyncTask(
 	})
 }
 
-func (manager *TaskManager) Trigger(task_name string, input_string string) {
+func (manager *TaskManager) Invoke(task_name string, input_string string, mutex *dogego_module_mutex.RedisMutex) {
 	for _, task := range manager.Tasks {
 		if task.TaskName == task_name {
-			log.Printf("Job %s be Trigged. Started Execute it.", task.TaskName)
+			defer func() {
+				if err := recover(); err != nil {
+					mutex.UnLock(task.TaskName)
+					log.Println(err)
+				}
+			}()
 
-			result := task.UnmarshalFN(input_string)
-			err := task.Job(result)
-			if err != nil {
-				log.Printf("Job %s Execute error %s", task.TaskName, err.Error())
+			if !mutex.Lock(task.TaskName, 0) {
+				log.Println("Lock this job error, this job is executing.")
+				return
 			}
 
-			log.Printf("Job %s Execute finish", task.TaskName)
+			result := task.UnmarshalFN(input_string)
+
+			from := time.Now().UnixNano()
+			err := task.Job(result)
+			to := time.Now().UnixNano()
+
+			if err != nil {
+				log.Printf("%s Task Execute Error: %dms\n", task.TaskName, (to-from)/int64(time.Millisecond))
+			} else {
+				log.Printf("%s Task Execute Success: %dms\n", task.TaskName, (to-from)/int64(time.Millisecond))
+			}
+
+			mutex.UnLock(task.TaskName)
 		}
 	}
 }

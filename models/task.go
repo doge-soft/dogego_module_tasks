@@ -5,7 +5,7 @@ const (
 	AsyncTrigger
 )
 
-const Sep = "%:#:#:#:%"
+const Sep = "#:#:#"
 
 type TaskInput interface {
 }
