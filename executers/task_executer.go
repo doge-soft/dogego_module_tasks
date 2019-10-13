@@ -18,7 +18,7 @@ func TaskExecuter(manager *managers.TaskManager, mutex *dogego_module_mutex.Redi
 			return err
 		}
 
-		go manager.Invoke(splits[0], rs, mutex, splits[1])
+		go manager.Invoke(splits[0], rs, mutex, global.DataKey(splits[1]))
 
 		return nil
 	}
