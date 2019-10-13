@@ -44,7 +44,7 @@ func (manager *TaskManager) RegisterAsyncTask(
 	})
 }
 
-func (manager *TaskManager) Invoke(task_name string, input_string string, mutex *dogego_module_mutex.RedisMutex) {
+func (manager *TaskManager) Invoke(task_name string, input_string string, mutex *dogego_module_mutex.RedisMutex, key string) {
 	for _, task := range manager.Tasks {
 		if task.TaskName == task_name {
 			defer func() {
@@ -53,11 +53,6 @@ func (manager *TaskManager) Invoke(task_name string, input_string string, mutex 
 					log.Println(err)
 				}
 			}()
-
-			if !mutex.Lock(task.TaskName, 0) {
-				log.Println("Lock this job error, this job is executing.")
-				return
-			}
 
 			result := task.UnmarshalFN(input_string)
 
@@ -71,7 +66,11 @@ func (manager *TaskManager) Invoke(task_name string, input_string string, mutex 
 				log.Printf("%s Task Execute Success: %dms\n", task.TaskName, (to-from)/int64(time.Millisecond))
 			}
 
-			mutex.UnLock(task.TaskName)
+			err = mutex.RedisClient.Del(key).Err()
+
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 }

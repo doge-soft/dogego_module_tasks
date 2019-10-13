@@ -29,7 +29,7 @@ func PublishTask(
 	}
 
 	// Publish Message
-	err = mq.Publish("tasks",
+	err = mq.Publish(XGetenv("TASKS_QUEUE", "tasks"),
 		fmt.Sprintf(
 			"%s#:#:#%s",
 			runtime.FuncForPC(reflect.ValueOf(job).Pointer()).Name(),

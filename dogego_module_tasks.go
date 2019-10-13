@@ -1,44 +1,28 @@
-package main
+package dogego_module_tasks
 
 import (
-	"encoding/json"
 	"github.com/doge-soft/dogego_module_mq"
 	"github.com/doge-soft/dogego_module_mutex"
 	"github.com/doge-soft/dogego_module_tasks/executers"
 	"github.com/doge-soft/dogego_module_tasks/managers"
-	"github.com/doge-soft/dogego_module_tasks/models"
 	"github.com/doge-soft/dogego_module_tasks/triggers"
-	"github.com/go-redis/redis"
+	"github.com/doge-soft/dogego_module_tasks/utils"
 	"log"
-	"time"
 )
 
-type A struct {
-	AB int
-}
-
-func T1(d models.TaskInput) error {
-	log.Println(d.(A))
-	panic("yqrx")
-	return nil
-}
-
-func main() {
-	client := redis.NewClient(&redis.Options{})
-	mq := dogego_module_mq.NewRedisMQ(client)
+func NewDogeGoTaskModule(mq *dogego_module_mq.RedisMQ,
+	mutex *dogego_module_mutex.RedisMutex) (*managers.TaskManager, *triggers.AsyncTrigger, *triggers.TimeTrigger) {
 	manager := managers.NewTaskManager()
-	mutex := dogego_module_mutex.NewRedisMutex(client)
 
-	mq.Custome("tasks", executers.TaskExecuter(manager, mutex))
+	err := mq.Custome(utils.XGetenv("TASKS_QUEUE", "tasks"),
+		executers.TaskExecuter(manager, mutex))
 
-	manager.RegisterAsyncTask(func(s string) models.TaskInput {
-		var r A
-		json.Unmarshal([]byte(s), &r)
+	if err != nil {
+		log.Println(err)
+	}
 
-		return r
-	}, T1)
+	async_trigger := triggers.NewAsyncTrigger(mq)
+	time_trigger := triggers.NewTimeTrigger(mq, manager, mutex)
 
-	triggers.NewAsyncTrigger(mq).TriggerAsyncTask(T1, A{AB: 1})
-
-	time.Sleep(time.Second * 10)
+	return manager, async_trigger, time_trigger
 }
